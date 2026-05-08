@@ -81,17 +81,27 @@ namespace Jellyfin.Server
             var acceptJsonHeader = new MediaTypeWithQualityHeaderValue(MediaTypeNames.Application.Json, 1.0);
             var acceptXmlHeader = new MediaTypeWithQualityHeaderValue(MediaTypeNames.Application.Xml, 0.9);
             var acceptAnyHeader = new MediaTypeWithQualityHeaderValue("*/*", 0.8);
-            Func<IServiceProvider, HttpMessageHandler> eyeballsHttpClientHandlerDelegate = (_) => new SocketsHttpHandler()
+            Func<IServiceProvider, HttpMessageHandler> eyeballsHttpClientHandlerDelegate = sp =>
             {
-                AutomaticDecompression = DecompressionMethods.All,
-                RequestHeaderEncodingSelector = (_, _) => Encoding.UTF8,
-                ConnectCallback = HttpClientExtension.OnConnect
+                var handler = new SocketsHttpHandler()
+                {
+                    AutomaticDecompression = DecompressionMethods.All,
+                    RequestHeaderEncodingSelector = (_, _) => Encoding.UTF8,
+                    ConnectCallback = HttpClientExtension.OnConnect
+                };
+                ApplyProxy(handler, sp);
+                return handler;
             };
 
-            Func<IServiceProvider, HttpMessageHandler> defaultHttpClientHandlerDelegate = (_) => new SocketsHttpHandler()
+            Func<IServiceProvider, HttpMessageHandler> defaultHttpClientHandlerDelegate = sp =>
             {
-                AutomaticDecompression = DecompressionMethods.All,
-                RequestHeaderEncodingSelector = (_, _) => Encoding.UTF8
+                var handler = new SocketsHttpHandler()
+                {
+                    AutomaticDecompression = DecompressionMethods.All,
+                    RequestHeaderEncodingSelector = (_, _) => Encoding.UTF8
+                };
+                ApplyProxy(handler, sp);
+                return handler;
             };
 
             services.AddHttpClient(NamedClient.Default, c =>
@@ -233,6 +243,24 @@ namespace Jellyfin.Server
                     endpoints.MapHealthChecks("/health");
                 });
             });
+        }
+
+        private static void ApplyProxy(SocketsHttpHandler handler, IServiceProvider services)
+        {
+            var provider = services.GetService<IProxyProvider>();
+            if (provider is null || !provider.IsEnabled)
+            {
+                return;
+            }
+
+            var proxy = provider.GetWebProxy();
+            if (proxy is null)
+            {
+                return;
+            }
+
+            handler.UseProxy = true;
+            handler.Proxy = proxy;
         }
     }
 }

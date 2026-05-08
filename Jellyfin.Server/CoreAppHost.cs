@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Emby.Server.Implementations;
+using Emby.Server.Implementations.Net;
 using Emby.Server.Implementations.Session;
 using Jellyfin.Api.WebSocketListeners;
 using Jellyfin.Database.Implementations;
@@ -22,6 +23,7 @@ using MediaBrowser.Controller.Devices;
 using MediaBrowser.Controller.Drawing;
 using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Common.Net;
 using MediaBrowser.Controller.Lyrics;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Controller.Security;
@@ -78,6 +80,7 @@ namespace Jellyfin.Server
             serviceCollection.AddEventServices();
             serviceCollection.AddSingleton<IBaseItemManager, BaseItemManager>();
             serviceCollection.AddSingleton<IEventManager, EventManager>();
+            serviceCollection.AddSingleton<IProxyProvider, ProxyProvider>();
 
             serviceCollection.AddSingleton<IActivityManager, ActivityManager>();
             serviceCollection.AddSingleton<IUserManager, UserManager>();

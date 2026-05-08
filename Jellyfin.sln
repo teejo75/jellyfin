@@ -98,6 +98,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Database.Implement
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.CodeAnalysis", "src\Jellyfin.CodeAnalysis\Jellyfin.CodeAnalysis.csproj", "{11643D0F-6761-4EF7-AB71-6F9F8DE00714}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.ProxyConfig", "Jellyfin.ProxyConfig\Jellyfin.ProxyConfig.csproj", "{7699BAE6-B1A3-4902-9E0F-4184D3EEA073}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -264,6 +266,10 @@ Global
 		{11643D0F-6761-4EF7-AB71-6F9F8DE00714}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{11643D0F-6761-4EF7-AB71-6F9F8DE00714}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{11643D0F-6761-4EF7-AB71-6F9F8DE00714}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7699BAE6-B1A3-4902-9E0F-4184D3EEA073}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7699BAE6-B1A3-4902-9E0F-4184D3EEA073}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7699BAE6-B1A3-4902-9E0F-4184D3EEA073}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7699BAE6-B1A3-4902-9E0F-4184D3EEA073}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
