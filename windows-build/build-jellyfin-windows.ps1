@@ -105,7 +105,7 @@ if (Test-Path $serviceScriptSrc) {
 }
 
 if (-not $NoZip) {
-    $zipPath = Join-Path $OutputRoot ("jellyfin_{0}_{1}.zip" -f $VersionSuffix, $Architecture)
+    $zipPath = Join-Path $OutputRoot ("jellyfin_{0}-proxy_{1}.zip" -f $VersionSuffix, $Architecture)
     Write-Host "==> Compress to $zipPath"
     if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
     Compress-Archive -Path $StageDir -DestinationPath $zipPath -CompressionLevel Optimal
