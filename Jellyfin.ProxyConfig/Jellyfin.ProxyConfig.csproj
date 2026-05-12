@@ -10,6 +10,7 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ApplicationIcon>Jellyfin.Server.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

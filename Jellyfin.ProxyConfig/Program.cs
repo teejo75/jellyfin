@@ -75,7 +75,7 @@ internal static class Program
         string? address = null;
         int? port = null;
         string? user = null;
-        string? password = null;
+        bool promptPassword = false;
         bool clearPassword = false;
 
         for (var i = 0; i < positional.Count; i++)
@@ -86,7 +86,7 @@ internal static class Program
                 case "address": address = RequireValue(positional, ref i, key); break;
                 case "port": port = int.Parse(RequireValue(positional, ref i, key), CultureInfo.InvariantCulture); break;
                 case "user" or "username": user = RequireValue(positional, ref i, key); break;
-                case "password": password = RequireValue(positional, ref i, key); break;
+                case "password": promptPassword = true; break;
                 case "no-password": clearPassword = true; break;
                 case "https": useHttps = true; break;
                 case "no-https": useHttps = false; break;
@@ -102,7 +102,18 @@ internal static class Program
         if (port is int p) settings.Port = p;
         if (useHttps is bool h) settings.UseHttps = h;
         if (user is not null) settings.Username = user;
-        if (password is not null) settings.EncryptedPassword = ProxyEncryption.Protect(password);
+        if (promptPassword)
+        {
+            var pw = PromptForPasswordWithConfirmation();
+            if (pw is null)
+            {
+                Console.Error.WriteLine("Aborted: no password entered.");
+                return ExitUsage;
+            }
+
+            settings.EncryptedPassword = ProxyEncryption.Protect(pw);
+        }
+
         if (clearPassword) settings.EncryptedPassword = null;
         if (enabled is bool e) settings.Enabled = e;
         else if (settings.Enabled is false && address is not null) settings.Enabled = true;
@@ -187,6 +198,73 @@ internal static class Program
         return ExitOk;
     }
 
+    /// <summary>
+    /// Prompts twice for a password with no echo. Reprompts from the beginning
+    /// if the two entries don't match. Returns null if the user enters an empty
+    /// password twice in a row (i.e. abort).
+    /// </summary>
+    private static string? PromptForPasswordWithConfirmation()
+    {
+        if (Console.IsInputRedirected)
+        {
+            Console.Error.WriteLine("--password requires an interactive console (stdin is redirected).");
+            return null;
+        }
+
+        while (true)
+        {
+            Console.Write("Proxy password: ");
+            var first = ReadHiddenLine();
+            if (first.Length == 0)
+            {
+                return null;
+            }
+
+            Console.Write("Confirm password: ");
+            var second = ReadHiddenLine();
+
+            if (string.Equals(first, second, StringComparison.Ordinal))
+            {
+                return first;
+            }
+
+            Console.WriteLine("Passwords do not match. Try again.");
+        }
+    }
+
+    /// <summary>
+    /// Reads a line from the console without echoing characters. Backspace edits.
+    /// Enter terminates.
+    /// </summary>
+    private static string ReadHiddenLine()
+    {
+        var buffer = new System.Text.StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            switch (key.Key)
+            {
+                case ConsoleKey.Enter:
+                    Console.WriteLine();
+                    return buffer.ToString();
+                case ConsoleKey.Backspace:
+                    if (buffer.Length > 0)
+                    {
+                        buffer.Length--;
+                    }
+
+                    break;
+                default:
+                    if (!char.IsControl(key.KeyChar))
+                    {
+                        buffer.Append(key.KeyChar);
+                    }
+
+                    break;
+            }
+        }
+    }
+
     private static void PrintUsage()
     {
         Console.WriteLine("""
@@ -201,7 +279,8 @@ internal static class Program
               --address HOST          Proxy host (e.g. proxy.example.com)
               --port N                Proxy port
               --user NAME             Username for proxy auth
-              --password PASS         Password (encrypted at rest with DPAPI/LocalMachine)
+              --password              Prompt (twice, no echo) for the password.
+                                      Encrypted at rest with DPAPI/LocalMachine.
               --no-password           Remove stored password
               --https / --no-https    Use https:// scheme to reach proxy
               --enable / --disable    Toggle whether the proxy is used
