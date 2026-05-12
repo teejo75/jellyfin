@@ -137,6 +137,11 @@ namespace Jellyfin.Server
 
             StartupHelpers.PerformStaticInitialization();
 
+            // Apply HTTP proxy globally BEFORE any HttpClient is constructed (incl. plugin
+            // clients like TMDbLib that don't use IHttpClientFactory). Reads proxy.xml in
+            // the config dir, then falls back to HTTPS_PROXY/HTTP_PROXY/ALL_PROXY env vars.
+            ProxyBootstrap.Apply(appPaths.ConfigurationDirectoryPath, _logger);
+
             await ApplyStartupMigrationAsync(appPaths, startupConfig).ConfigureAwait(false);
 
             do
