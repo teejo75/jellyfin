@@ -66,24 +66,34 @@ function Action-Install {
     }
 
     $binPath = '"{0}" --service --datadir "{1}"' -f $exe, $DataDir
-    $accountId = if ($Account -eq 'LocalSystem') { 'LocalSystem' } else { 'NT AUTHORITY\NetworkService' }
-    $startArg  = switch ($StartType) {
-        'Automatic' { 'auto' }
-        'Manual'    { 'demand' }
-        'Disabled'  { 'disabled' }
-    }
 
     Write-Host "Creating service '$ServiceName'"
-    Write-Host "  binPath: $binPath"
-    Write-Host "  account: $accountId"
-    Write-Host "  start:   $startArg"
+    Write-Host "  binPath:   $binPath"
+    Write-Host "  account:   $Account"
+    Write-Host "  startType: $StartType"
 
-    & sc.exe create $ServiceName binPath= $binPath DisplayName= $DisplayName start= $startArg obj= $accountId | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "sc.exe create failed (exit $LASTEXITCODE)" }
-
-    & sc.exe description $ServiceName $Description | Out-Host
+    # Create the service as LocalSystem (New-Service default). On PS 5.1,
+    # -Credential prompts for input even when passed a built-in account, so we
+    # always create as LocalSystem and switch to NetworkService afterwards via
+    # the Win32_Service.Change WMI method.
+    New-Service `
+        -Name           $ServiceName `
+        -BinaryPathName $binPath `
+        -DisplayName    $DisplayName `
+        -Description    $Description `
+        -StartupType    $StartType | Out-Null
 
     if ($Account -eq 'NetworkService') {
+        Write-Host "Switching service account to NT AUTHORITY\NetworkService"
+        $cimSvc = Get-CimInstance -ClassName Win32_Service -Filter "Name='$ServiceName'"
+        $change = Invoke-CimMethod -InputObject $cimSvc -MethodName Change -Arguments @{
+            StartName     = 'NT AUTHORITY\NetworkService'
+            StartPassword = ''
+        }
+        if ($change.ReturnValue -ne 0) {
+            throw "Win32_Service.Change returned $($change.ReturnValue); could not set account to NetworkService."
+        }
+
         Write-Host "Granting NetworkService modify rights on $DataDir"
         $acl = Get-Acl $DataDir
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
@@ -93,8 +103,7 @@ function Action-Install {
         Set-Acl $DataDir $acl
     }
 
-    Write-Host "Service installed. Starting..."
-    Start-Service -Name $ServiceName
+    Write-Host "Service installed. Run '.\service-control.ps1 start' to start it."
     Action-Status
 }
 
@@ -113,8 +122,13 @@ function Action-Uninstall {
     }
 
     Write-Host "Deleting service..."
+    # PS 5.1 has no Remove-Service. CimInstance does not expose a dynamic
+    # Delete() method on this PS version, so shell out to sc.exe.
     & sc.exe delete $ServiceName | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "sc.exe delete failed (exit $LASTEXITCODE)" }
+    if ($LASTEXITCODE -ne 0) {
+        throw "sc.exe delete returned exit code $LASTEXITCODE."
+    }
+
     Write-Host "Removed."
 }
 
