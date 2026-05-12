@@ -170,8 +170,21 @@ namespace Jellyfin.Server
             var configurationCompleted = false;
             try
             {
-                _jellyfinHost = Host.CreateDefaultBuilder()
-                    .UseConsoleLifetime()
+                var hostBuilder = Host.CreateDefaultBuilder();
+                if (options.IsService)
+                {
+                    // Signal SERVICE_RUNNING to the SCM and switch to the
+                    // Windows service lifetime. Without this, sc.exe times out
+                    // waiting for the connection (event 7009) and the service
+                    // is marked as failed even though the process is running.
+                    hostBuilder.UseWindowsService(opts => opts.ServiceName = "JellyfinServer");
+                }
+                else
+                {
+                    hostBuilder.UseConsoleLifetime();
+                }
+
+                _jellyfinHost = hostBuilder
                     .ConfigureServices(services => appHost.Init(services))
                     .ConfigureWebHostDefaults(webHostBuilder =>
                     {
