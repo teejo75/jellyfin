@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
 
 $Rid       = "win-$Architecture"
-$StageDir  = Join-Path $OutputRoot 'jellyfin'
+$StageDir  = Join-Path $OutputRoot 'Jellyfin\Server'
 $WebDist   = Join-Path $WebRepo 'dist'
 
 if (-not $VersionSuffix) {
@@ -43,12 +43,22 @@ if (-not $SkipServer) {
         -o $StageDir --nologo
     if ($LASTEXITCODE -ne 0) { throw "Server publish failed" }
 
-    Write-Host "==> dotnet publish Jellyfin.ProxyConfig"
+    Write-Host "==> dotnet publish Jellyfin.ProxyConfig (single-file self-contained)"
+    # Publish to a separate dir so the single-file bundling doesn't see the
+    # server's runtime DLLs as duplicates. Then copy only the standalone exe
+    # into the staging dir.
+    $proxyOut = Join-Path $OutputRoot 'proxyconfig'
+    if (Test-Path $proxyOut) { Remove-Item -Recurse -Force $proxyOut }
     & dotnet publish (Join-Path $ServerRepo 'Jellyfin.ProxyConfig\Jellyfin.ProxyConfig.csproj') `
-        -c Release -r $Rid --self-contained false `
-        -p:UseAppHost=true -p:DebugSymbols=false -p:DebugType=none `
-        -o $StageDir --nologo
+        -c Release -r $Rid --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:EnableCompressionInSingleFile=true `
+        -p:DebugSymbols=false -p:DebugType=none `
+        -o $proxyOut --nologo
     if ($LASTEXITCODE -ne 0) { throw "ProxyConfig publish failed" }
+    Copy-Item (Join-Path $proxyOut 'jellyfin-proxyconfig.exe') $StageDir -Force
+    Remove-Item -Recurse -Force $proxyOut
 }
 
 if (-not $SkipWeb) {
@@ -105,7 +115,8 @@ if (Test-Path $serviceScriptSrc) {
 }
 
 if (-not $NoZip) {
-    $zipPath = Join-Path $OutputRoot ("jellyfin_{0}-proxy_{1}.zip" -f $VersionSuffix, $Architecture)
+    $buildStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $zipPath = Join-Path $OutputRoot ("jellyfin_{0}-proxy_{1}_{2}.zip" -f $VersionSuffix, $Architecture, $buildStamp)
     Write-Host "==> Compress to $zipPath"
     if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
     Compress-Archive -Path $StageDir -DestinationPath $zipPath -CompressionLevel Optimal
