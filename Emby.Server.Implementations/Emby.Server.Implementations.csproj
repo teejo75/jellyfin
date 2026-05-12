@@ -19,6 +19,7 @@
     <ProjectReference Include="..\src\Jellyfin.Drawing\Jellyfin.Drawing.csproj" />
     <ProjectReference Include="..\MediaBrowser.MediaEncoding\MediaBrowser.MediaEncoding.csproj" />
     <ProjectReference Include="..\src\Jellyfin.Database\Jellyfin.Database.Implementations\Jellyfin.Database.Implementations.csproj" />
+    <ProjectReference Include="..\Jellyfin.Proxy.Shared\Jellyfin.Proxy.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,7 +33,6 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="prometheus-net.DotNetRuntime" />
     <PackageReference Include="DotNet.Glob" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
 
   <ItemGroup>

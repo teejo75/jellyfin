@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Small, dependency-free library for the proxy DTO + DPAPI helper + sidecar
+    XML loader. Shared between the server (via Emby.Server.Implementations) and
+    the standalone jellyfin-proxyconfig CLI. Kept in its own project so the
+    CLI's single-file publish does not pull in MediaBrowser.Common (which uses
+    Assembly.Location and trips IL3000).
+  -->
+
+  <PropertyGroup>
+    <ProjectGuid>{1F3F2C9A-7E4B-4D08-9F23-9C5C8C4B1A22}</ProjectGuid>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\SharedVersion.cs" />
+  </ItemGroup>
+
+</Project>

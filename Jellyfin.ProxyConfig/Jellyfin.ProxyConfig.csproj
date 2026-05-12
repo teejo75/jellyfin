@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MediaBrowser.Common\MediaBrowser.Common.csproj" />
+    <ProjectReference Include="..\Jellyfin.Proxy.Shared\Jellyfin.Proxy.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
