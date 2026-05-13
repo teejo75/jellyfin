@@ -1,6 +1,5 @@
 using System;
 using System.Net;
-using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -80,12 +79,6 @@ namespace MediaBrowser.Common.Net
                 return null;
             }
 
-            if (!OperatingSystem.IsWindows())
-            {
-                logger.LogWarning("Proxy authentication requires Windows DPAPI; running on non-Windows OS — credentials ignored");
-                return null;
-            }
-
             if (string.IsNullOrEmpty(settings.EncryptedPassword))
             {
                 logger.LogWarning("Proxy username '{User}' is set but EncryptedPassword is empty", settings.Username);
@@ -94,28 +87,24 @@ namespace MediaBrowser.Common.Net
 
             try
             {
-                var password = DecryptOnWindows(settings.EncryptedPassword);
+                var password = ProxyEncryption.Unprotect(settings.EncryptedPassword);
                 return new NetworkCredential(settings.Username, password);
             }
             catch (FormatException ex)
             {
                 logger.LogError(
                     ex,
-                    "EncryptedPassword in proxy.xml is not valid Base64. Did you hand-edit the file? Use jellyfin-proxyconfig.exe to set the password — it must be DPAPI-encrypted.");
+                    "EncryptedPassword in proxy.xml is not valid Base64. Did you hand-edit the file? Use jellyfin-proxyconfig to set the password.");
                 return null;
             }
             catch (CryptographicException ex)
             {
                 logger.LogError(
                     ex,
-                    "Failed to DPAPI-decrypt proxy password. This usually means the ciphertext was produced on a different machine, by a different user, or hand-written. Use jellyfin-proxyconfig.exe on THIS machine to set it.");
+                    "Failed to decrypt proxy password. The blob is bound to the machine it was created on. Use jellyfin-proxyconfig on THIS machine to set it.");
                 return null;
             }
         }
-
-        [SupportedOSPlatform("windows")]
-        private static string DecryptOnWindows(string? encrypted)
-            => ProxyEncryption.Unprotect(encrypted);
 
         private static IWebProxy? BuildFromEnvironment(ILogger logger)
         {

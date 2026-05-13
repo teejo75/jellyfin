@@ -1,12 +1,10 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Runtime.Versioning;
 using MediaBrowser.Common.Net;
 
 namespace Jellyfin.ProxyConfig;
 
-[SupportedOSPlatform("windows")]
 internal static class Program
 {
     private const int ExitOk = 0;
@@ -15,12 +13,6 @@ internal static class Program
 
     public static int Main(string[] args)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            Console.Error.WriteLine("This utility requires Windows (uses DPAPI).");
-            return ExitError;
-        }
-
         if (args.Length == 0)
         {
             PrintUsage();
@@ -75,7 +67,6 @@ internal static class Program
         string? address = null;
         int? port = null;
         string? user = null;
-        bool promptPassword = false;
         bool clearPassword = false;
 
         for (var i = 0; i < positional.Count; i++)
@@ -86,7 +77,6 @@ internal static class Program
                 case "address": address = RequireValue(positional, ref i, key); break;
                 case "port": port = int.Parse(RequireValue(positional, ref i, key), CultureInfo.InvariantCulture); break;
                 case "user" or "username": user = RequireValue(positional, ref i, key); break;
-                case "password": promptPassword = true; break;
                 case "no-password": clearPassword = true; break;
                 case "https": useHttps = true; break;
                 case "no-https": useHttps = false; break;
@@ -101,9 +91,13 @@ internal static class Program
         if (address is not null) settings.Address = address;
         if (port is int p) settings.Port = p;
         if (useHttps is bool h) settings.UseHttps = h;
-        if (user is not null) settings.Username = user;
-        if (promptPassword)
+        if (user is not null)
         {
+            settings.Username = user;
+
+            // Whenever a username is provided, prompt for the matching password.
+            // Passing the password on the command line would leak it via process
+            // listings and shell history.
             var pw = PromptForPasswordWithConfirmation();
             if (pw is null)
             {
@@ -207,7 +201,7 @@ internal static class Program
     {
         if (Console.IsInputRedirected)
         {
-            Console.Error.WriteLine("--password requires an interactive console (stdin is redirected).");
+            Console.Error.WriteLine("Password prompt requires an interactive console (stdin is redirected).");
             return null;
         }
 
@@ -268,7 +262,7 @@ internal static class Program
     private static void PrintUsage()
     {
         Console.WriteLine("""
-            jellyfin-proxyconfig — manage Jellyfin outbound HTTP proxy settings (Windows).
+            jellyfin-proxyconfig — manage Jellyfin outbound HTTP proxy settings.
 
             Usage:
               jellyfin-proxyconfig show   [--config-dir DIR]
@@ -278,18 +272,20 @@ internal static class Program
             'set' options (all optional; only provided keys are updated):
               --address HOST          Proxy host (e.g. proxy.example.com)
               --port N                Proxy port
-              --user NAME             Username for proxy auth
-              --password              Prompt (twice, no echo) for the password.
-                                      Encrypted at rest with DPAPI/LocalMachine.
+              --user NAME             Username for proxy auth. Prompts (twice, no echo)
+                                      for the matching password.
               --no-password           Remove stored password
               --https / --no-https    Use https:// scheme to reach proxy
               --enable / --disable    Toggle whether the proxy is used
 
+            The password is encrypted at rest with AES-256-GCM using a key derived from
+            this machine's identifier. Encrypted blobs cannot be moved between hosts.
+
             Config dir resolution (in order):
               --config-dir argument
               JELLYFIN_CONFIG_DIR env var
-              %JELLYFIN_DATA_DIR%\config
-              %LocalAppData%\jellyfin\config
+              $JELLYFIN_DATA_DIR/config
+              <platform local app data>/jellyfin/config
             """);
     }
 }
