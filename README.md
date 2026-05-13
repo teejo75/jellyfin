@@ -1,4 +1,5 @@
-<h1 align="center">Jellyfin</h1>
+<h1 align="center">Jellyfin · Proxy-Aware Fork</h1>
+<p align="center">Authenticating HTTP proxy support and native Windows Service integration.</p>
 <h3 align="center">The Free Software Media System</h3>
 
 ---
@@ -36,6 +37,101 @@
 <img alt="Master Commits RSS Feed" src="https://img.shields.io/badge/rss-commits-ffa500?logo=rss" />
 </a>
 </p>
+
+---
+This is a fork of Jellyfin that adds support for outgoing connections via an
+authenticating proxy. This allows metadata fetchers, plugin manifests and
+plugin installation to work in a proxied environment. The fork tracks upstream
+Jellyfin stable releases.
+
+Jellyfin honours the usual `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY`
+environment variables as a fallback. For persistent configuration with stored
+credentials, a new console application `jellyfin-proxyconfig` (`.exe` on
+Windows) writes the settings to a sidecar `proxy.xml` in the configuration
+directory. The password is encrypted at rest with AES-256-GCM using a key
+derived from the host machine's identifier — credentials cannot be transferred
+between hosts.
+
+On Windows this binary also runs as a proper Windows service. The upstream
+`--service` flag was parsed but never wired up; this fork hooks it into
+`Microsoft.Extensions.Hosting.WindowsServices` so the service signals
+`SERVICE_RUNNING` to the SCM directly, without needing an NSSM shim.
+
+The server is cross-platform. The CLI builds for Windows by default; adjust
+`<RuntimeIdentifiers>` in `Jellyfin.ProxyConfig.csproj` and run
+`dotnet publish -r linux-x64` (or `osx-x64`, etc.) to produce a Linux/macOS
+binary. The encryption uses `/etc/machine-id` on Linux and `IOPlatformUUID` on
+macOS.
+
+## Install Guide (Windows)
+
+1. **Extract the archive** to the install location, e.g. `C:\Program Files\Jellyfin\Server\`.
+2. **Open an elevated PowerShell** and change directory to that location.
+3. **Choose a data directory** for Jellyfin (database, config, logs, cache). The
+   default is `%ProgramData%\Jellyfin\Server`. To use somewhere else, set
+   `JELLYFIN_DATA_DIR` for the current shell so the tools below pick it up:
+   ```powershell
+   $Env:JELLYFIN_DATA_DIR = "$Env:ProgramData\Jellyfin\Server"
+   ```
+   The service itself does not need this environment variable — `service-control.ps1 install` bakes the data directory into the service's binary path. The variable is only consulted by the CLI tools.
+
+4. **Configure the proxy** (skip if you don't need one).
+   ```powershell
+   .\jellyfin-proxyconfig.exe set `
+       --address proxy.example.com --port 8080 `
+       --user DOMAIN\username `
+       --enable
+   ```
+   The CLI prompts twice (no echo) for the matching password whenever
+   `--user` is provided. The password is encrypted under a key bound to this
+   machine, so the resulting `proxy.xml` cannot be reused on a different host.
+
+   By default `proxy.xml` is written to the config directory resolved in this
+   order:
+   1. `--config-dir` argument
+   2. `$Env:JELLYFIN_CONFIG_DIR`
+   3. `$Env:JELLYFIN_DATA_DIR\config`
+   4. `$Env:LocalAppData\jellyfin\config`
+
+   Run `.\jellyfin-proxyconfig.exe` with no arguments for the full usage.
+
+5. **Install the Windows service.**
+   ```powershell
+   .\service-control.ps1 install
+   ```
+   With no options the service is created as `JellyfinServer`, account
+   `NetworkService`, start type `Automatic`, data dir
+   `%ProgramData%\Jellyfin\Server`. To override:
+   ```powershell
+   .\service-control.ps1 install `
+       [-DataDir <path>] `
+       [-Account NetworkService|LocalSystem] `
+       [-StartType Automatic|Manual|Disabled] `
+       [-ServiceName <name>] [-DisplayName <name>] [-Description <text>]
+   ```
+   Service-management subcommands (no arguments needed):
+   ```
+   .\service-control.ps1 [install|uninstall|start|stop|restart|status]
+   ```
+   To change service settings after install, run `uninstall` and re-install
+   with the new arguments.
+
+6. **Start the service.**
+   ```powershell
+   .\service-control.ps1 start
+   ```
+   Watch `$Env:JELLYFIN_DATA_DIR\log` for the latest log file — the first
+   start takes a few seconds while the database initialises. Then open
+   `http://<host>:8096` in a browser to run the initial setup wizard.
+
+### Note: dashboard "Restart" button
+
+Clicking *Restart* on the dashboard exits the service process with a non-zero
+code. The SCM is configured (by `service-control.ps1 install`) to auto-restart
+on failure after 5 seconds. This appears in the System event log as event
+7034 ("service terminated unexpectedly") followed ~5s later by 7036 ("service
+entered the running state"). The 7034 is cosmetic; it's how the SCM names any
+non-clean exit, including this intentional one.
 
 ---
 
