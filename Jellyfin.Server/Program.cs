@@ -150,6 +150,19 @@ namespace Jellyfin.Server
 
                 if (_restartOnShutdown)
                 {
+                    if (options.IsService)
+                    {
+                        // In-process restart is not safe under WindowsServiceLifetime: a
+                        // second Host.StartAsync in the same process throws "Stopped
+                        // without starting" because SCM cancellation state leaks into the
+                        // new host. Exit non-zero instead so the SCM's failure recovery
+                        // restarts the process. service-control.ps1 install configures
+                        // the failure actions to restart after 5s.
+                        _logger.LogInformation("Restart requested while running as a Windows service; exiting so the SCM restarts the process.");
+                        _setupServer.Dispose();
+                        Environment.Exit(1);
+                    }
+
                     _startTimestamp = Stopwatch.GetTimestamp();
                     await _setupServer.StopAsync().ConfigureAwait(false);
                     await _setupServer.RunAsync().ConfigureAwait(false);
