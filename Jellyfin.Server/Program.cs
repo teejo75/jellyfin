@@ -155,12 +155,11 @@ namespace Jellyfin.Server
                         // In-process restart is not safe under WindowsServiceLifetime: a
                         // second Host.StartAsync in the same process throws "Stopped
                         // without starting" because SCM cancellation state leaks into the
-                        // new host. Exit non-zero instead so the SCM's failure recovery
-                        // restarts the process. service-control.ps1 install configures
-                        // the failure actions to restart after 5s.
-                        _logger.LogInformation("Restart requested while running as a Windows service; exiting so the SCM restarts the process.");
-                        _setupServer.Dispose();
-                        Environment.Exit(1);
+                        // new host. StartServer above has already set
+                        // WindowsServiceLifetime.ExitCode = 1, so when this method
+                        // returns the SCM sees a non-zero stop and the configured
+                        // failure-recovery action restarts the service in a fresh process.
+                        break;
                     }
 
                     _startTimestamp = Stopwatch.GetTimestamp();
@@ -267,6 +266,23 @@ namespace Jellyfin.Server
                 await _jellyfinHost.WaitForShutdownAsync().ConfigureAwait(false);
                 _restartOnShutdown = appHost.ShouldRestart;
                 _restoreFromBackup = appHost.RestoreBackupPath;
+
+                if (_restartOnShutdown && options.IsService && OperatingSystem.IsWindows())
+                {
+                    // Tell the SCM this stop is a failure so the configured failure-
+                    // recovery action restarts the service. WindowsServiceLifetime
+                    // reports ServiceBase.ExitCode in its final SetServiceStatus call;
+                    // we must set it before the host disposes (which happens at the end
+                    // of this method via the `using` declaration above).
+                    var lifetime = _jellyfinHost.Services.GetService<IHostLifetime>();
+                    if (lifetime is Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceLifetime wsl)
+                    {
+                        wsl.ExitCode = 1;
+                        _logger.LogInformation(
+                            "Restart requested while running as a Windows service. " +
+                            "Reporting non-zero SCM exit code so the failure-recovery action restarts the service.");
+                    }
+                }
             }
             catch (Exception ex)
             {
