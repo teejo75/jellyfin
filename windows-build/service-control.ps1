@@ -117,6 +117,17 @@ function Action-Install {
         Write-Warning "sc.exe failure returned exit code $LASTEXITCODE; dashboard Restart will not auto-resume."
     }
 
+    # By default the SCM only runs failure actions when the service process dies
+    # WITHOUT reporting SERVICE_STOPPED. The dashboard Restart makes Jellyfin
+    # report SERVICE_STOPPED with a non-zero exit code, which the SCM treats as a
+    # clean stop unless this flag is set. Setting the failure-actions flag tells
+    # the SCM to also run the recovery actions on a stop-with-error-code.
+    Write-Host "Enabling failure actions on non-zero exit (failureflag)"
+    & sc.exe failureflag $ServiceName 1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "sc.exe failureflag returned exit code $LASTEXITCODE; dashboard Restart will not auto-resume."
+    }
+
     Write-Host "Service installed. Run '.\service-control.ps1 start' to start it."
     Action-Status
 }
